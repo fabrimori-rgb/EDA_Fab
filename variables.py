@@ -4,16 +4,27 @@ import pandas as pd
 
 
 DATA_DIR = Path.home() / "Desktop" / "datos_futbol_limpios"
+ARCHIVOS_CSV = (
+    "marcadores_limpio.csv",
+    "paises_limpio.csv",
+    "penalties_limpio.csv",
+    "resultados_limpio.csv",
+)
 
 
 def cargar_datos() -> dict[str, pd.DataFrame]:
-    archivos_csv = sorted(DATA_DIR.glob("*.csv"))
-    if not archivos_csv:
-        raise FileNotFoundError(f"No se encontraron archivos CSV en {DATA_DIR}")
+    archivos_faltantes = [
+        nombre for nombre in ARCHIVOS_CSV if not (DATA_DIR / nombre).is_file()
+    ]
+    if archivos_faltantes:
+        raise FileNotFoundError(
+            f"Faltan CSV requeridos en {DATA_DIR}: "
+            f"{', '.join(archivos_faltantes)}"
+        )
 
     return {
-        archivo.stem: pd.read_csv(archivo)
-        for archivo in archivos_csv
+        Path(nombre).stem: pd.read_csv(DATA_DIR / nombre)
+        for nombre in ARCHIVOS_CSV
     }
 
 

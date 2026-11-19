@@ -6,6 +6,11 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
+from funciones import (
+    clasificar_torneo,
+    preparar_registros_selecciones,
+    ranking_derrotas,
+)
 from variables import cargar_datos, preparar_goles_mundial
 
 
@@ -252,35 +257,6 @@ def graficar_factor_campo(
     guardar_figura(fig, "05_factor_campo", figuras)
 
 
-def clasificar_torneo(nombre: str) -> str:
-    normalizado = (
-        unicodedata.normalize("NFKD", str(nombre))
-        .encode("ascii", "ignore")
-        .decode("ascii")
-        .lower()
-    )
-    if "friendly" in normalizado:
-        return "Amistoso"
-    if "qualification" in normalizado:
-        return "Eliminatorias / Clasificacion"
-    if "world cup" in normalizado:
-        return "Copa del Mundo (Fase Final)"
-    if any(
-        torneo in normalizado
-        for torneo in [
-            "euro",
-            "copa america",
-            "african cup",
-            "asian cup",
-            "gold cup",
-            "nations cup",
-            "championship",
-        ]
-    ):
-        return "Torneo Continental"
-    return "Otros / Regionales"
-
-
 def graficar_victorias_por_torneo(
     resultados: pd.DataFrame, figuras: list[plt.Figure]
 ) -> None:
@@ -327,66 +303,6 @@ def graficar_victorias_por_torneo(
         ax.set_visible(False)
     fig.tight_layout()
     guardar_figura(fig, "06_victorias_por_tipo_de_torneo", figuras)
-
-
-def preparar_registros_selecciones(resultados: pd.DataFrame) -> pd.DataFrame:
-    local = resultados[
-        ["home_team", "away_team", "home_score", "away_score"]
-    ].rename(
-        columns={
-            "home_team": "seleccion",
-            "away_team": "rival",
-            "home_score": "goles_favor",
-            "away_score": "goles_contra",
-        }
-    )
-    visitante = resultados[
-        ["away_team", "home_team", "away_score", "home_score"]
-    ].rename(
-        columns={
-            "away_team": "seleccion",
-            "home_team": "rival",
-            "away_score": "goles_favor",
-            "home_score": "goles_contra",
-        }
-    )
-    registros = pd.concat([local, visitante], ignore_index=True)
-    registros["derrota"] = (
-        registros["goles_contra"] > registros["goles_favor"]
-    ).astype(int)
-    return registros
-
-
-def ranking_derrotas(
-    registros: pd.DataFrame, seleccion: str, orden: str
-) -> pd.DataFrame:
-    sub = registros[registros["seleccion"] == seleccion]
-    resumen = (
-        sub.groupby("rival")["derrota"]
-        .agg(derrotas="sum", total_partidos="count")
-        .reset_index()
-    )
-    if resumen.empty:
-        return resumen
-
-    resumen["porcentaje_derrotas"] = (
-        resumen["derrotas"] / resumen["total_partidos"] * 100
-    ).round(1)
-    if orden == "ponderado":
-        max_derrotas = max(int(resumen["derrotas"].max()), 1)
-        max_porcentaje = max(float(resumen["porcentaje_derrotas"].max()), 1)
-        resumen["score_ponderado"] = (
-            0.5 * resumen["derrotas"] / max_derrotas
-            + 0.5 * resumen["porcentaje_derrotas"] / max_porcentaje
-        ).mul(100).round(1)
-        columna_orden = "score_ponderado"
-    elif orden == "absoluto":
-        columna_orden = "derrotas"
-    else:
-        columna_orden = "porcentaje_derrotas"
-    return resumen.sort_values(
-        columna_orden, ascending=False, ignore_index=True
-    ).head(15)
 
 
 def graficar_ranking_derrotas(
@@ -528,8 +444,11 @@ def graficar_pichichi_mundial(
     guardar_figura(fig, "11_top_10_pichichi_tempranero_mundial", figuras)
 
 
-def generar_graficos() -> None:
-    dataframes = cargar_datos()
+def generar_graficos(
+    dataframes: dict[str, pd.DataFrame] | None = None,
+) -> None:
+    if dataframes is None:
+        dataframes = cargar_datos()
     print("DataFrames cargados:")
     for nombre, dataframe in dataframes.items():
         print(f"- {nombre}: {dataframe.shape[0]} filas, {dataframe.shape[1]} columnas")
